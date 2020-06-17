@@ -3,6 +3,7 @@
 Usage: 
     ideaseed (--help | --about | --version)
     ideaseed [options] [-t TAG...] ARGUMENTS...
+    ideaseed [options] --interactive
 
 Examples:
     # Save a card "test" in schoolsyst/webapp > project "UX" > column "To-Do"
@@ -29,7 +30,7 @@ Options:
                             When used together with --issue, --tag means labels.
     -i --issue              Creates an issue for the card and link them together. IDEA becomes the issue's title, except if --title is specified,
                             in which case IDEA becomes the issue's description and --title's value the issue title.
-    (WIP) -I --interactive  Prompts you for the above options when they are not provided.
+    -I --interactive        Prompts you for the above options when they are not provided.
     -T --title TEXT         Sets the Google Keep card's title. When used with --issue, sets the issue's title.
     -L --logout             Clears the authentification cache
     -m --create-missing     Create non-existant tags, labels, projects or columns specified, upon confirmation.
@@ -54,7 +55,7 @@ from pprint import pprint
 from ideaseed.utils import dye, get_token_cache_filepath
 from ideaseed.constants import COLOR_NAME_TO_HEX_MAP
 from ideaseed.dumb_utf8_art import DUMB_UTF8_ART
-
+from ideaseed import interactive_mode
 
 def run(argv=None):
     args = resolve_arguments(
@@ -76,6 +77,10 @@ def run(argv=None):
 
     if args["--logout"]:
         clear_auth_cache()
+    
+    if args['--interactive']:
+        interactive_mode.run(args)
+        return
 
     if args["REPO"]:
         if args["REPO"] == args["--user-keyword"]:
