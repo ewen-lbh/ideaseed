@@ -37,6 +37,8 @@ Options:
        --pin                   Pin Google Keep cards
        --about                 Details about ideaseed like currently-installed version
        --version               Like --about, without dumb and useless stuff
+       --json                  Format output in JSON, see "Data items" for the keys outputted
+       --print ITEMS           Output ITEMS (,-separated list of ITEMs) to stdout, one ITEM per line. See "Data items" for possible values
 
 Settings options: It's comfier to set these in your alias, e.g. alias idea="ideaseed --user-project=incubator --user-keyword=project --no-auth-cache --create-missing"
        --user-project NAME     Name of the project to use as your user project
@@ -51,6 +53,26 @@ Color names: Try with the first letter only too
     - indigo is the same as darkblue
     - grey is the same as gray
     - magenta is the same as purple
+
+Data items:
+    Item name       Data type           Description
+    --------------  ------------------  ----------------------------------------------
+    issue_number    Integer             The issue's number
+    service         {github,gkeep}      The service used
+    username        String              The username of the user that used the API to perform the action
+    url             String              The URL which would be open by your web browser if --open was passed
+    title           String              The Google Keep card title or github issue title
+    body            String              The Google Keep card body or the github issue/note body
+    labels          String[]            A comma-separated list of labels applied to the issue/google keep card
+                                        WARNING: Do *not* use this with --print if your label names can contain commas, use --json instead.
+                                                 --json will output a regular string array, whilst with --print, commas will not be escaped.
+    is_issue        Boolean             "true" if a GitHub issue was created, "false" if not
+    project         String              The name of the project the card was added to
+    column          String              The name of the column of the project the card added to
+    owner           String              The repository owner of the project the card was added to
+    repository      String              The repository's name (without the "owner/" part)
+    is_user_project Boolean             "true" if the card was added to a github user profile project, "false" if not
+    color           String (color)      The color of the Google Keep card created
 """
 
 from ideaseed.update_checker import get_latest_version
@@ -84,10 +106,12 @@ def run(argv=None):
     )
     validate_argument_presence(args)
     args = resolve_arguments_defaults(args)
-    
-    args['--tag'] += args['--label']
+
+    args["--tag"] += args["--label"]
     # Remove duplicate tags
-    args['--tag'] = list(set(args['--tag'])) #XXX: We're loosing order of elements here.
+    args["--tag"] = list(
+        set(args["--tag"])
+    )  # XXX: We're loosing order of elements here.
 
     if not args["--no-check-for-updates"]:
         latest_version = get_latest_version()
@@ -167,6 +191,11 @@ def validate_argument_presence(args: Dict[str, str]) -> None:
         raise ValidationError(
             "--tag may only be used alongside --issue or when"
             "adding a card to Google Keep."
+        )
+
+    if using_github and args["PROJECT"] == args["--user-keyword"] and args["--issue"]:
+        raise ValidationError(
+            "Cannot create an issue on a GitHub user profile project."
         )
 
     if using_github and any([v for k, v in args.items() if k in GOOGLE_KEEP_ONLY]):
