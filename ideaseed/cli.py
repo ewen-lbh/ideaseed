@@ -2,7 +2,7 @@
 
 Usage: 
     ideaseed (--help | --about | --version)
-    ideaseed [options] [-t TAG...] ARGUMENTS...
+    ideaseed [options] [-t TAG...] [-l LABEL...] ARGUMENTS...
     ideaseed [options] --interactive
 
 Examples:
@@ -30,7 +30,7 @@ Options:
                             When used together with --issue, --tag means labels.
     -i --issue              Creates an issue for the card and link them together. IDEA becomes the issue's title, except if --title is specified,
                             in which case IDEA becomes the issue's description and --title's value the issue title.
-    -I --interactive        Prompts you for the above options when they are not provided.
+    (WIP) -I --interactive  Prompts you for the above options when they are not provided.
     -T --title TEXT         Sets the Google Keep card's title. When used with --issue, sets the issue's title.
     -L --logout             Clears the authentification cache
     -m --create-missing     Create non-existant tags, labels, projects or columns specified, upon confirmation.
@@ -39,37 +39,65 @@ Options:
        --version            Like --about, without dumb and useless stuff
 
 Settings options: It's comfier to set these in your alias, e.g. alias idea="ideaseed --user-project=incubator --user-keyword=project --no-auth-cache --create-missing"
-       --user-project NAME  Name of the project to use as your user project
-       --user-keyword NAME  When REPO is NAME, creates a GitHub card on your user profile instead of putting it on REPO
-       --no-auth-cache      Don't save credentials in a temporary file at {cache_filepath}
+       --user-project NAME     Name of the project to use as your user project
+       --user-keyword NAME     When REPO is NAME, creates a GitHub card on your user profile instead of putting it on REPO
+       --no-auth-cache         Don't save credentials in a temporary file at {cache_filepath}
+       --no-check-for-updates  Don't check for updates, don't prompt to update when current version is outdated
 
 Color names: Try with the first letter only too
     blue, brown, darkblue, gray, green, orange, pink, purple, red, teal, white, yellow
+    Some color have aliases:
+    - cyan is the same as teal
+    - indigo is the same as darkblue
+    - grey is the same as gray
+    - magenta is the same as purple
 """
 
+from ideaseed.update_checker import get_latest_version
+from ideaseed import update_checker
 from ideaseed.gkeep import push_to_gkeep
 from ideaseed.github import clear_auth_cache, push_to_repo, push_to_user
 from typing import *
-from docopt import docopt
+from colr import docopt
 from pprint import pprint
 from ideaseed.utils import dye, get_token_cache_filepath
 from ideaseed.constants import COLOR_NAME_TO_HEX_MAP
 from ideaseed.dumb_utf8_art import DUMB_UTF8_ART
-from ideaseed import interactive_mode
 
 def run(argv=None):
     args = resolve_arguments(
-        docopt(__doc__.format(cache_filepath=get_token_cache_filepath("*")), argv)
+        docopt(
+            __doc__.format(cache_filepath=get_token_cache_filepath("*")),
+            argv,
+            script="ideaseed",
+        )
     )
     validate_argument_presence(args)
     args = resolve_arguments_defaults(args)
 
+    args["--tag"] += args["--label"]
+    # Remove duplicate tags
+    args["--tag"] = list(
+        set(args["--tag"])
+    )  # XXX: We're loosing order of elements here.
+
+    if not args["--no-check-for-updates"]:
+        latest_version = get_latest_version()
+        if latest_version > VERSION:
+            print(update_checker.notification(VERSION, latest_version))
+            if update_checker.prompt(latest_version):
+                update_checker.upgrade(latest_version)
+                print(f"Re-running your command with ideaseed v{latest_version}...")
+                print("Running " + " ".join(sys.argv))
+                subprocess.run(sys.argv)
+                return
+
     if args["--about"]:
-        print(DUMB_UTF8_ART.format(version="0.2.1"))
+        print(ABOUT_SCREEN.format(version=VERSION))
         return
 
     if args["--version"]:
-        print("0.2.1")
+        print(VERSION)
         return
 
     if args["--color"]:
@@ -127,9 +155,15 @@ def validate_argument_presence(args: Dict[str, str]) -> None:
     on the other arguments.
     """
 
-    GOOGLE_KEEP_ONLY = ("--color", "--tag")
+    GOOGLE_KEEP_ONLY = ("--color",)
     GITHUB_ONLY = ("--issue",)
     using_github = len(args["ARGUMENTS"]) > 1
+
+    if using_github and not args["--issue"] and args["--tag"]:
+        raise ValidationError(
+            "--tag may only be used alongside --issue or when"
+            "adding a card to Google Keep."
+        )
 
     if using_github and any([v for k, v in args.items() if k in GOOGLE_KEEP_ONLY]):
         raise ValidationError(
@@ -145,14 +179,19 @@ def validate_argument_presence(args: Dict[str, str]) -> None:
 
 
 def expand_color_name(color: str) -> str:
-    # All possible color names
-    color_names = [k for k in COLOR_NAME_TO_HEX_MAP.keys()]
     # Initialize the array of matches
     matching_color_names: List[str] = []
     # Filter `color_names` to only get the color names that start with `color`
-    for color_name in color_names:
+    for color_name in VALID_COLOR_NAMES:
         if color_name.lower().startswith(color.lower()):
             matching_color_names += [color_name]
+    # Resolve synonyms
+    matching_color_names_resolved = matching_color_names
+    for i, color_name in enumerate(matching_color_names):
+        if color_name in COLOR_ALIASES.keys():
+            matching_color_names_resolved[i] = COLOR_ALIASES[color_name]
+    # Remove duplicates
+    matching_color_names = list(set(matching_color_names))
     # If we have exactly _one_ element of `color_names` that matches, we return the only
     # element: it's a match!
     if len(matching_color_names) == 1:

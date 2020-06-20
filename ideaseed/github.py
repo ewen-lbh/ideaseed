@@ -1,11 +1,23 @@
+from ideaseed.dumb_utf8_art import (
+    make_github_issue_art,
+    make_github_project_art,
+    make_github_user_project_art,
+)
 import os
+import re
 import webbrowser
 import pprint
 from os.path import dirname
 import github
 from github import Issue
 from github.GithubException import BadCredentialsException, TwoFactorException
-from ideaseed.utils import ask, dye, get_token_cache_filepath
+from ideaseed.utils import (
+    ask,
+    dye,
+    get_random_color_hexstring,
+    get_token_cache_filepath,
+)
+from random import randint
 from ideaseed.constants import C_PRIMARY
 from typing import *
 from github import Github
@@ -13,6 +25,17 @@ import json
 from github.GithubException import TwoFactorException
 import inquirer as q
 from ideaseed.utils import ask
+
+
+def validate_label_color(answers: dict, color: str):
+    """
+    Throws a `inquirer.errors.ValidationError` when the format isn't matched.
+    (format: 6-digit hex int representing a color)
+    """
+    if not re.match(r"[a-fA-F0-9]{6}", color):
+        raise q.errors.ValidationError(
+            "", reason="Please use a valid color (6-digit hexadecimal integer)"
+        )
 
 
 def login_with_cache() -> Optional[Github]:
@@ -118,6 +141,9 @@ def github_username(gh: Github) -> str:
 
 
 def resolve_self_repository_shorthand(gh: Github, repo: str) -> str:
+    """
+    Returns adds USERNAME/ to a `repo` that has no slashes
+    """
     if "/" not in repo:
         return github_username(gh) + "/" + repo
     return repo
@@ -129,12 +155,46 @@ def push_to_repo(args: Dict[str, Any]) -> None:
     idea = args["IDEA"]
     project_name = args["PROJECT"]
     column_name = args["COLUMN"]
-    print(
-        f"Saving card in {dye(repo_name, C_PRIMARY)}"
-        f" › {dye(project_name, C_PRIMARY)}"
-        f" › {dye(column_name, C_PRIMARY)}..."
-    )
     repo = gh.get_repo(repo_name)
+    username = github_username(gh)
+
+    # Get all labels
+    labels = repo.get_labels()
+    for label_name in args["--tag"]:
+        if (
+            label_name.lower() not in [t.name.lower() for t in labels]
+            and args["--create-missing"]
+        ):
+            if ask(
+                q.Confirm(
+                    "ans", message=f"Label {label_name!r} does not exist. Create it?"
+                )
+            ):
+                label_data = q.prompt(
+                    [
+                        # TODO: Proper color prompt with color names, live color preview, default value that is removed once you start typing.
+                        #       will need to use prompt-toolkit at some point.
+                        # q.Text(
+                        #     "color",
+                        #     message="Choose a color for your label",
+                        #     validate=validate_label_color,
+                        #     default=lambda ans: f"{randint(0x0, 0xFFFFFF):6x}".upper()
+                        # ),
+                        q.Text(
+                            "description",
+                            message="A short description of your label",
+                            default="",
+                        ),
+                    ]
+                )
+
+                color = randint(0x0, 0xFFFFFF)
+                print(
+                    "Creating label "
+                    + dye(label_name, fg=color, style="reverse")
+                    + " ..."
+                )
+                repo.create_label(name=label_name, color=f"{color:6x}", **label_data)
 
     project = None
     for p in repo.get_projects():
@@ -146,7 +206,7 @@ def push_to_repo(args: Dict[str, Any]) -> None:
     if project is None and args["--create-missing"]:
         if ask(q.Confirm("ans", message=f"Create missing project {project_name!r}?")):
             description: str = ask(
-                q.Editor("ans", message="Enter the project's description...")
+                q.Text("ans", message="Enter the project's description...")
             )
             project = repo.create_project(name=project_name, body=description)
         else:
@@ -174,26 +234,53 @@ def push_to_repo(args: Dict[str, Any]) -> None:
         print(dye(f"Error: column {column_name!r} does not exist!", fg=0xF00))
         return
 
+    owner, repository = repo_name.split("/")
+
     if args["--issue"]:
         issue = repo.create_issue(
             title=args["--title"] or idea,
             body=idea if args["--title"] else "",
-            assignees=[github_username(gh)],
+            assignees=[username],
             labels=args["--tag"],
         )
         card = column.create_card(content_id=issue.id, content_type="Issue")
+        url = issue.html_url if args["--title"] else project.html_url
+
+        print(
+            make_github_issue_art(
+                owner=owner,
+                repository=repository,
+                project=project.name,
+                column=column.name,
+                username=username,
+                url=url,
+                issue_number=issue.number,
+                labels=args["--tag"],
+                body=issue.body,
+                title=issue.title,
+            )
+        )
 
         if args["--open"]:
-            if args["--title"]:
-                webbrowser.open(issue.html_url)
-            else:
-                webbrowser.open(project.html_url)
+            webbrowser.open(url)
     else:
         card = column.create_card(note=idea)
+        url = project.html_url
+
+        print(
+            make_github_project_art(
+                owner=owner,
+                repository=repository,
+                project=project_name,
+                column=column_name,
+                body=args["IDEA"],
+                url=url,
+            )
+        )
 
         # Open project URL
         if args["--open"]:
-            webbrowser.open(project.html_url)
+            webbrowser.open(url)
 
 
 def push_to_user(args: Dict[str, Any]) -> None:
@@ -201,6 +288,7 @@ def push_to_user(args: Dict[str, Any]) -> None:
     idea = args["IDEA"]
     project_name: str = args["--user-project"]
     column_name: str = args["PROJECT"]
+    username = github_username(gh)
     print(
         f"Saving card in {dye(github_username(gh), C_PRIMARY)} › {dye(project_name, C_PRIMARY)} › {dye(column_name, C_PRIMARY)}..."
     )
@@ -244,8 +332,18 @@ def push_to_user(args: Dict[str, Any]) -> None:
         return
 
     column.create_card(note=idea)
+    url = project.html_url
+
+    print(
+        make_github_user_project_art(
+            username=username,
+            project=project_name,
+            column=column_name,
+            body=args["IDEA"],
+            url=url,
+        )
+    )
 
     # Open project URL
     if args["--open"]:
-        webbrowser.open(project.html_url)
-
+        webbrowser.open(url)

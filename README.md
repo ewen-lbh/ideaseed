@@ -20,6 +20,8 @@ Ideaseed is available [on PyPI.org](https://pypi.org/project/ideaseed):
 pip install ideaseed
 ```
 
+See [Installation troubleshooting](#installation-troubleshooting) if you can't install it like this.
+
 ## Usage
 
 ```bash
@@ -54,20 +56,22 @@ $ ideaseed --user-keyword=project --user-project=incubator project "a CLI to not
 
 ### Options
 
-| Shorthand | Full-length         | Description                                                                                                  |
-| --------- | ------------------- | ------------------------------------------------------------------------------------------------------------ |
-| -c        | --color COLOR       | Chooses which color to use for Google Keep cards. See [Color names](#color-names) for a list of valid values |
-| -t        | --tag TAG           | Adds tags to the Google Keep card.                                                                           |
-| -i        | --issue TITLE       | Creates an issue with title TITLE.                                                                           |
-| -I        | --interactive       | Prompts you for the above options when they are not provided.                                                |
-| -L        | --logout            | Clears the authentification cache                                                                            |
-| -m        | --create-missing    | Create non-existant tags, projects or columns specified (needs confirmation if -I is used)                   |
-| -o        | --open              | Open the relevant URL in your web browser.                                                                   |
-|           | --about             | Details about ideaseed like currently-installed version                                                      |
-|           | --version           | Like --about, without dumb and useless stuff                                                                 |
-|           | --user-project NAME | Name of the project to use as your user project                                                              |
-|           | --user-keyword NAME | When REPO is NAME, creates a GitHub card on your user profile instead of putting it on REPO                  |
-|           | --no-auth-cache     | Don't save credentials in a temporary file                                                                   |
+| Shorthand | Full-length            | Description                                                                                                     |
+| --------- | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| -c        | --color COLOR          | Chooses which color to use for Google Keep cards. See [Color names](#color-names) for a list of valid values    |
+| -t        | --tag TAG              | Adds tags to the Google Keep card. Can also be used on GitHub together with --issue to add labels to the issue. |
+| -i        | --issue TITLE          | Creates an issue with title TITLE.                                                                              |
+| -I        | --interactive          | Prompts you for the above options when they are not provided.                                                   |
+| -L        | --logout               | Clears the authentification cache                                                                               |
+| -m        | --create-missing       | Create non-existant tags, projects or columns specified (needs confirmation if -I is used)                      |
+| -o        | --open                 | Open the relevant URL in your web browser.                                                                      |
+|           | --pin                  | Pin the Google Keep card                                                                                        |
+|           | --about                | Details about ideaseed like currently-installed version                                                         |
+|           | --version              | Like --about, without dumb and useless stuff                                                                    |
+|           | --user-project NAME    | Name of the project to use as your user project                                                                 |
+|           | --user-keyword NAME    | When REPO is NAME, creates a GitHub card on your user profile instead of putting it on REPO                     |
+|           | --no-auth-cache        | Don't save credentials in a temporary file                                                                      |
+|           | --no-check-for-updates | Don't check for updates, don't prompt to update when current version is outdated                                |
 
 #### Color names
 
@@ -99,6 +103,13 @@ You don't have to specify the whole color name, just enough to be non-ambiguous:
 - w
 - y
 
+Some color have aliases:
+
+- cyan is the same as teal
+- indigo is the same as darkblue
+- grey is the same as gray
+- magenta is the same as purple
+
 #### Relax. You don't need to remember those options
 
 You can also use `ideaseed -I` to prompt you for some information:
@@ -112,3 +123,29 @@ You can also use `ideaseed -I` to prompt you for some information:
 - If you decide to use google keep,
   - Which color? (defaults to white)
   - Some tags?
+
+## Installation troubleshooting
+
+If you get an error message saying "No matching distribution found":
+
+```sh-session
+$ pip install ideaseed
+Collecting ideaseed
+  Could not find a version that satisfies the requirement ideaseed (from versions: )
+No matching distribution found for ideaseed
+```
+
+See if the python version `pip` uses is at least 3.6:
+
+```sh-session
+$ pip --version
+pip 9.0.1 from /usr/lib/python2.7/dist-packages (python 2.7) # Should be at least "(python 3.6)"
+```
+
+You can then try with `pip3` (`pip3 --version` should report a python version of at least 3.6):
+
+```sh-session
+$ pip3 --version
+pip 20.0.2 from /home/ewen/.local/lib/python3.7/site-packages/pip (python 3.7)
+$ pip3 install ideaseed
+```

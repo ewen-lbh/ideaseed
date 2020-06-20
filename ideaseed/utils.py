@@ -3,6 +3,8 @@ from typing import *
 import colr
 import inquirer
 from os import path
+from random import randint
+
 
 def dye(
     text: str,
@@ -18,6 +20,10 @@ def dye(
         style=style,
         no_closing=no_closing,
     )
+
+
+def get_random_color_hexstring() -> str:
+    return f"{randint(0x0, 0xFFFFFF):6x}".upper()
 
 
 def ask(*questions) -> Union[List[Any], Any]:
@@ -38,5 +44,6 @@ def ask(*questions) -> Union[List[Any], Any]:
     answers = [a[1] for a in answers]
     return answers
 
+
 def get_token_cache_filepath(service: str) -> str:
-    return path.join(path.dirname(path.dirname(__file__)), f'.auth-cache--{service}')
+    return path.join(path.dirname(path.dirname(__file__)), f".auth-cache--{service}")
