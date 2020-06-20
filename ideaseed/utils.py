@@ -5,6 +5,12 @@ import inquirer
 from os import path
 from random import randint
 
+def get_uiprint_function(args: Dict[str, Any]) -> Callable:
+    def uiprint(text: str, **kwargs):
+        if args['--json'] or args['--print']:
+           return
+        print(text)
+    return uiprint
 
 def dye(
     text: str,

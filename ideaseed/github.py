@@ -11,6 +11,7 @@ from ideaseed.utils import (
     dye,
     get_random_color_hexstring,
     get_token_cache_filepath,
+    get_uiprint_function,
 )
 from random import randint
 from ideaseed.constants import C_PRIMARY
@@ -74,6 +75,7 @@ def login(args: Dict[str, Any], method: Optional[str] = None) -> Github:
     Prompts the user to login, either via username/password
     or using a Personal Access Token
     """
+    uiprint = get_uiprint_function(args)
     gh = login_with_cache()
     if gh is not None:
         return gh
@@ -141,13 +143,70 @@ def resolve_self_repository_shorthand(gh: Github, repo: str) -> str:
     return repo
 
 
+def data_items_printer(
+    args: Dict[str, Any],
+    issue_number: Optional[int],
+    service: Optional[str],
+    username: Optional[str],
+    url: Optional[str],
+    title: Optional[str],
+    body: Optional[str],
+    labels: Optional[str],
+    is_issue: Optional[bool],
+    project: Optional[str],
+    column: Optional[str],
+    owner: Optional[str],
+    repository: Optional[str],
+    is_user_project: Optional[bool],
+    color: Optional[str],
+):
+    data = {
+        "issue_number": issue_number,
+        "service": service,
+        "username": username,
+        "url": url,
+        "title": title,
+        "body": body,
+        "labels": labels,
+        "is_issue": is_issue,
+        "project": project,
+        "column": column,
+        "owner": owner,
+        "repository": repository,
+        "is_user_project": is_user_project,
+        "color": color,
+    }
+    if args["--json"]:
+        print(json.dumps(data))
+        return
+    if args["--print"]:
+        items_printed = [a.strip() for a in args["--print"].split(",")]
+        # print each key line-by-line in specified order.
+        for key in items_printed:
+            try:
+                value = data[key]
+            except KeyError:
+                print(
+                    f"Error while printing data items: {key!r} is not a valid data item. "
+                    "See ideaseed --help for more information"
+                )
+                return
+            if type(value) is list:
+                value = ",".join(value)
+            if type(value) is bool:
+                value = "true" if value else "false"
+            print(value)
+
+
 def push_to_repo(args: Dict[str, Any]) -> None:
     gh = login(args)
     repo_name = resolve_self_repository_shorthand(gh, args["REPO"])
     idea = args["IDEA"]
     project_name = args["PROJECT"]
     column_name = args["COLUMN"]
-    print(
+    url = None
+    uiprint = get_uiprint_function(args)
+    uiprint(
         f"Saving card in {dye(repo_name, C_PRIMARY)}"
         f" › {dye(project_name, C_PRIMARY)}"
         f" › {dye(column_name, C_PRIMARY)}..."
@@ -183,16 +242,14 @@ def push_to_repo(args: Dict[str, Any]) -> None:
                         ),
                     ]
                 )
-                
+
                 color = randint(0x0, 0xFFFFFF)
-                print(
+                uiprint(
                     "Creating label "
                     + dye(label_name, fg=color, style="reverse")
                     + " ..."
                 )
-                repo.create_label(
-                    name=label_name, color=f'{color:6x}', **label_data
-                )
+                repo.create_label(name=label_name, color=f"{color:6x}", **label_data)
 
     project = None
     for p in repo.get_projects():
@@ -243,15 +300,39 @@ def push_to_repo(args: Dict[str, Any]) -> None:
 
         if args["--open"]:
             if args["--title"]:
-                webbrowser.open(issue.html_url)
+                url = issue.html_url
+                webbrowser.open(url)
             else:
-                webbrowser.open(project.html_url)
+                url = project.html_url
+                webbrowser.open(url)
     else:
+        issue = None
         card = column.create_card(note=idea)
 
         # Open project URL
         if args["--open"]:
-            webbrowser.open(project.html_url)
+            url = project.html_url
+            webbrowser.open(url)
+
+    owner, repository = repo_name.split("/")
+
+    data_items_printer(
+        args,
+        issue_number=issue.number,
+        service="github",
+        username="TODO",
+        url=url,
+        title=args["--title"],
+        body=issue.body if args["--issue"] else card.note,
+        labels=[l.name for l in issue.labels] if args["--issue"] else None,
+        is_issue=args["--issue"],
+        is_user_project=False,
+        project=project_name,
+        column=column_name,
+        owner=owner,
+        repository=repository,
+        color=None,
+    )
 
 
 def push_to_user(args: Dict[str, Any]) -> None:
@@ -259,7 +340,8 @@ def push_to_user(args: Dict[str, Any]) -> None:
     idea = args["IDEA"]
     project_name: str = args["--user-project"]
     column_name: str = args["PROJECT"]
-    print(
+    uiprint = get_uiprint_function(args)
+    uiprint(
         f"Saving card in {dye(github_username(gh), C_PRIMARY)} › {dye(project_name, C_PRIMARY)} › {dye(column_name, C_PRIMARY)}..."
     )
     project = None
@@ -302,6 +384,23 @@ def push_to_user(args: Dict[str, Any]) -> None:
         return
 
     column.create_card(note=idea)
+    data_items_printer(
+        args,
+        issue_number=None,
+        service="github",
+        username="TODO",
+        url=project.html_url,
+        title=None,
+        body=args["IDEA"],
+        labels=None,
+        is_issue=False,
+        is_user_project=True,
+        project=project_name,
+        column=column_name,
+        owner=None,
+        repository=None,
+        color=None,
+    )
 
     # Open project URL
     if args["--open"]:
