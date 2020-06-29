@@ -1,8 +1,10 @@
-# ideaseed
+<center><p align="center">
+<img alt="ideaseed" src="https://raw.githubusercontent.com/ewen-lbh/ideaseed/master/visual-identity/ideaseed-logomark-color-transparent.svg" width="550px">
+</p></center>
 
 Do you have ideas suddenly and just wished you could catch them as fast as possible, as to not loose them, without having to interrupt what you were doing?
 
-As I guy without a lot of more or less stupid ideas, I use Google Keep as a centralized place to put all of my thoughts that I deem worthy of consideration.
+As I guy with a lot of more or less stupid ideas, I use Google Keep as a centralized place to put all of my thoughts that I deem worthy of consideration.
 
 I recently started to use GitHub Projects for _coding_ project ideas as a [single project called "incubator" on my GitHub profile directly](https://github.com/ewen-lbh?tab=projects), and as issues or notes when the idea is related to an already-existing project and repo.
 
@@ -21,6 +23,16 @@ pip install ideaseed
 ```
 
 See [Installation troubleshooting](#installation-troubleshooting) if you can't install it like this.
+
+## Updating
+
+Except if you specify `--no-check-updates`, the program will automatically check for new versions and ask to upgrade for you (since [v0.4.0]). If you want to upgrade manually, simply run
+
+```sh-session
+pip install -U ideaseed
+```
+
+To see the version history, you can read the [changelog](https://github.com/ewen-lbh/ideaseed/tree/master/CHANGELOG.md), though, since [v0.9.0], you can read the release notes straight from your terminal by choosing "What has changed?" when the "Upgrade available" notification asks you if you want to update.
 
 ## Usage
 
@@ -42,36 +54,58 @@ $ ideaseed --user-keyword=project --user-project=incubator project "a CLI to not
 
 ### Arguments
 
-| Argument | Meaning                                                                                                              | Default value  |
-| -------- | -------------------------------------------------------------------------------------------------------------------- | -------------- |
-| REPO     | Select a repository by name                                                                                          |
-|          | If not given, uses Google Keep instead of GitHub (or uses your user profile's projects if --project is used)         |
-|          | If --user-keyword's value is given, creates a card on your user's project (select which project with --user-project) |
-|          | If given in the form OWNER/REPO, uses the repository OWNER/REPO                                                      |
-|          | If given in the form REPO, uses the repository "your username/REPO"                                                  |
-| PROJECT  | Select a project by name to put your card to [default: REPO's value]                                                 | `REPO`'s value |
-|          | If creating a card on your user's project, this becomes the COLUMN                                                   |
-| COLUMN   | Select a project's column by name [default: To-Do]                                                                   | To-Do          |
-|          | If creating a card on your user's project, this is ignored                                                           |
+| Argument  | Meaning                                                                                                              | Default value  |
+| --------- | -------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `REPO`    | Select a repository by name                                                                                          |
+|           | If not given, uses Google Keep instead of GitHub (or uses your user profile's projects if --project is used)         |
+|           | If --user-keyword's value is given, creates a card on your user's project (select which project with --user-project) |
+|           | If given in the form OWNER/REPO, uses the repository OWNER/REPO                                                      |
+|           | If given in the form REPO, uses the repository "your username/REPO"                                                  |
+| `PROJECT` | Select a project by name to put your card to [default: REPO's value]                                                 | `REPO`'s value |
+|           | If creating a card on your user's project, this becomes the COLUMN                                                   |
+| `COLUMN`  | Select a project's column by name [default: To-Do]                                                                   | To-Do          |
+|           | If creating a card on your user's project, this is ignored                                                           |
 
 ### Options
 
 | Shorthand | Full-length            | Description                                                                                                     |
 | --------- | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
-| -c        | --color COLOR          | Chooses which color to use for Google Keep cards. See [Color names](#color-names) for a list of valid values    |
-| -t        | --tag TAG              | Adds tags to the Google Keep card. Can also be used on GitHub together with --issue to add labels to the issue. |
-| -i        | --issue TITLE          | Creates an issue with title TITLE.                                                                              |
-| -I        | --interactive          | Prompts you for the above options when they are not provided.                                                   |
-| -L        | --logout               | Clears the authentification cache                                                                               |
-| -m        | --create-missing       | Create non-existant tags, projects or columns specified (needs confirmation if -I is used)                      |
-| -o        | --open                 | Open the relevant URL in your web browser.                                                                      |
-|           | --pin                  | Pin the Google Keep card                                                                                        |
-|           | --about                | Details about ideaseed like currently-installed version                                                         |
-|           | --version              | Like --about, without dumb and useless stuff                                                                    |
-|           | --user-project NAME    | Name of the project to use as your user project                                                                 |
-|           | --user-keyword NAME    | When REPO is NAME, creates a GitHub card on your user profile instead of putting it on REPO                     |
-|           | --no-auth-cache        | Don't save credentials in a temporary file                                                                      |
-|           | --no-check-for-updates | Don't check for updates, don't prompt to update when current version is outdated                                |
+| `-c`      | `--color COLOR`        | Chooses which color to use for Google Keep cards. See [Color names](#color-names) for a list of valid values    |
+| `-t`      | `--tag TAG`            | Adds tags to the Google Keep card. Can also be used on GitHub together with --issue to add labels to the issue. |
+| `-i`      | `--issue TITLE`        | Creates an issue with title TITLE.                                                                              |
+| `-L`      | `--logout`             | Clears the authentification cache                                                                               |
+| `-m`      | `--create-missing`     | Create non-existant tags, projects or columns specified (needs confirmation if -I is used)                      |
+| `-o`      | `--open`               | Open the relevant URL in your web browser.                                                                      |
+| `-l`      | `--label LABEL`        | Alias for --tag. See --tag's description.                                                                       |
+| `-@`      | `--assign-to USERNAME` | Assigns users to the created issue. Only works when --issue is used.                                            |
+| `-M`      | `--milestone TITLE`    | Assign the issue to a milestone with title TITLE.                                                               |
+|           | `--pin`                | Pin the Google Keep card                                                                                        |
+|           | `--config`             | Easily configure your ideaseed and create your alias. See [Configuration options](#configuration-options)       |
+|           | `--about`              | Details about ideaseed like currently-installed version                                                         |
+|           | `--version`            | Like --about, without dumb and useless stuff                                                                    |
+
+#### Configuration options
+
+Use `ideaseed --config` to set those up automagically. It will ask you questions and append an 'alias' command to your shell's config/rc file.
+
+| Flag                     | Description                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------- |
+| `--user-project NAME`    | Name of the project to use as your user project                                             |
+| `--user-keyword NAME`    | When REPO is NAME, creates a GitHub card on your user profile instead of putting it on REPO |
+| `--no-auth-cache`        | Don't save credentials in a temporary file                                                  |
+| `--no-check-for-updates` | Don't check for updates, don't prompt to update when current version is outdated            |
+| `--no-self-assign`       | Don't assign the issue to yourself                                                          |
+| `--default-column NAME`  | Set the default column name. [default: To Do]                                               |
+| `--default-project NAME` | Set the default project name. [default: %(repository)s]                                     |
+
+#### Available placeholders for `--default-*`-options
+
+| Placeholder      | Description                                                      |
+| ---------------- | ---------------------------------------------------------------- |
+| `%(repository)s` | the repository's name                                            |
+| `%(owner)s`      | the repository's owner                                           |
+| `%(username)s`   | the username of which account you are using ideaseed with        |
+| `%(project)s`    | the selected project's name (only available to --default-column) |
 
 #### Color names
 
@@ -110,7 +144,7 @@ Some color have aliases:
 - grey is the same as gray
 - magenta is the same as purple
 
-#### Relax. You don't need to remember those options
+#### Relax. You don't need to remember those options (Coming in [v1.0.0])
 
 You can also use `ideaseed -I` to prompt you for some information:
 
@@ -149,3 +183,15 @@ $ pip3 --version
 pip 20.0.2 from /home/ewen/.local/lib/python3.7/site-packages/pip (python 3.7)
 $ pip3 install ideaseed
 ```
+
+[v1.0.0]: https://github.com/ewen-lbh/ideaseed/milestone/2
+[v0.4.0]: https://github.com/ewen-lbh/ideaseed/tree/master/CHANGELOG.md#040---2020-06-18
+[v0.9.0]: https://github.com/ewen-lbh/ideaseed/blob/master/CHANGELOG.md#090---2020-06-22
+
+* * *
+
+<center><p align="center">
+  <img src="https://raw.githubusercontent.com/ewen-lbh/ideaseed/master/visual-identity/ideaseed-logo-black-transparent.png" width="40px">
+  <br>
+  ideaseed by <a href="https://ewen.works">Ewen Le Bihan</a>
+</p></center>

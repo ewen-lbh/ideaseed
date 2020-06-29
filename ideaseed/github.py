@@ -1,3 +1,4 @@
+from github.Label import Label
 from ideaseed.dumb_utf8_art import (
     make_github_issue_art,
     make_github_project_art,
@@ -6,16 +7,14 @@ from ideaseed.dumb_utf8_art import (
 import os
 import re
 import webbrowser
-import pprint
 from os.path import dirname
-import github
-from github import Issue
 from github.GithubException import BadCredentialsException, TwoFactorException
 from ideaseed.utils import (
     ask,
     dye,
-    get_random_color_hexstring,
     get_token_cache_filepath,
+    print_dry_run,
+    error_message_no_object_found,
 )
 from random import randint
 from ideaseed.constants import C_PRIMARY
@@ -92,7 +91,7 @@ def login(args: Dict[str, Any], method: Optional[str] = None) -> Github:
             choices=["Personal Access Token", "Username and password"],
             ignore=lambda _: method is not None,
         ),
-        q.Text(
+        q.Password(
             name="pat",
             message="Personal Access Token",
             ignore=lambda ans: (method or ans["method"]) != "Personal Access Token",
@@ -149,22 +148,50 @@ def resolve_self_repository_shorthand(gh: Github, repo: str) -> str:
     return repo
 
 
+def resolve_default_arguments(
+    args: Dict[str, Any], repo_name: str, username: str
+) -> Dict[str, Any]:
+    """
+    Resolves defaults for COLUMN and PROJECT using --default-* arguments
+    ``repo_name`` must be of the form ``OWNER/REPO``
+    
+    >>> resolve_default_arguments(
+    ...     { 'REPO': 'test', 'COLUMN': None, 'PROJECT': 'testy',
+    ...     '--default-project': '1', '--default-column': '%(project)s' },
+    ...     repo_name='ewen-lbh/project',
+    ...     username='ewen-lbh',
+    ... )
+    { 'OWNER': 'ewen-lbh', 'REPO': 'test', 'COLUMN': 'testy', 'PROJECT': 'testy', '--default-project': '1', '--default-column': '%(project)s' }
+    """
+    placeholders = dict()
+    placeholders["owner"], placeholders["repository"] = repo_name.split("/")
+    placeholders["username"] = username
+    args["PROJECT"] = args["PROJECT"] or (args["--default-project"] % (placeholders))
+    placeholders["project"] = args["PROJECT"]
+    args["COLUMN"] = args["COLUMN"] or (args["--default-column"] % (placeholders))
+
+    return args
+
+
 def push_to_repo(args: Dict[str, Any]) -> None:
     gh = login(args)
     repo_name = resolve_self_repository_shorthand(gh, args["REPO"])
+    repo = gh.get_repo(repo_name)
+    username = github_username(gh)
+    args = resolve_default_arguments(args, repo_name, username)
     idea = args["IDEA"]
     project_name = args["PROJECT"]
     column_name = args["COLUMN"]
-    repo = gh.get_repo(repo_name)
-    username = github_username(gh)
+    assignees = args["--assign-to"] or (
+        [username] if not args["--no-self-assign"] else []
+    )
 
     # Get all labels
-    labels = repo.get_labels()
+    all_labels = repo.get_labels()
+    labels: List[Label] = []
     for label_name in args["--tag"]:
-        if (
-            label_name.lower() not in [t.name.lower() for t in labels]
-            and args["--create-missing"]
-        ):
+        not_found = label_name.lower() not in [t.name.lower() for t in all_labels]
+        if not_found and args["--create-missing"]:
             if ask(
                 q.Confirm(
                     "ans", message=f"Label {label_name!r} does not exist. Create it?"
@@ -194,7 +221,18 @@ def push_to_repo(args: Dict[str, Any]) -> None:
                     + dye(label_name, fg=color, style="reverse")
                     + " ..."
                 )
-                repo.create_label(name=label_name, color=f"{color:6x}", **label_data)
+                labels += [
+                    repo.create_label(
+                        name=label_name, color=f"{color:6x}", **label_data
+                    )
+                ]
+            else:
+                return
+        elif not_found:
+            print(error_message_no_object_found("label", label_name))
+            return
+        else:
+            labels += [repo.get_label(label_name)]
 
     project = None
     for p in repo.get_projects():
@@ -213,7 +251,7 @@ def push_to_repo(args: Dict[str, Any]) -> None:
             return
     # Not found and not create
     elif project is None:
-        print(dye(f"Error: project {project_name!r} does not exist!", fg=0xF00))
+        print(error_message_no_object_found("project", project_name))
         return
 
     # Column
@@ -231,20 +269,63 @@ def push_to_repo(args: Dict[str, Any]) -> None:
             return
     # Not found and not create
     elif column is None:
-        print(dye(f"Error: column {column_name!r} does not exist!", fg=0xF00))
+        print(error_message_no_object_found("column", column_name))
         return
+
+    # Milestone
+    milestone = None
+    if args["--milestone"]:
+        for m in repo.get_milestones():
+            if m.title.lower() == args["--milestone"].lower():
+                milestone = m
+                break
+        if milestone is None and args["--create-missing"]:
+            if ask(
+                q.Confirm(
+                    "ans", message=f"Create missing milestone {args['--milestone']!r}?"
+                )
+            ):
+                # TODO: Ask for a due date
+                milestone = repo.create_milestone(title=args["--milestone"])
+            else:
+                return
+        elif milestone is None:
+            print(error_message_no_object_found("milestone", args["--milestone"]))
+            return
 
     owner, repository = repo_name.split("/")
 
     if args["--issue"]:
-        issue = repo.create_issue(
+        # Cant just use milestone=milestone because
+        # create_issue(milestone=None) does not work, linter says.
+        issue_creation_args = dict(
             title=args["--title"] or idea,
             body=idea if args["--title"] else "",
-            assignees=[username],
+            assignees=assignees,
             labels=args["--tag"],
         )
-        card = column.create_card(content_id=issue.id, content_type="Issue")
-        url = issue.html_url if args["--title"] else project.html_url
+
+        issue = None
+        if not args["--dry-run"]:
+            if milestone is not None:
+                issue = repo.create_issue(**issue_creation_args, milestone=milestone)
+            else:
+                issue = repo.create_issue(**issue_creation_args)
+
+            card = column.create_card(content_id=issue.id, content_type="Issue")
+            url = issue.html_url
+        else:
+            if milestone is not None:
+                print_dry_run(
+                    f"repo.create_issue(**{issue_creation_args!r}, milestone={milestone!r})"
+                )
+            else:
+                print_dry_run(f"repo.create_issue(**{issue_creation_args!r})")
+
+            print_dry_run(
+                f'column.create_card(content_id=issue.id, content_type="Issue")'
+            )
+            url = "N/A"
 
         print(
             make_github_issue_art(
@@ -254,18 +335,26 @@ def push_to_repo(args: Dict[str, Any]) -> None:
                 column=column.name,
                 username=username,
                 url=url,
-                issue_number=issue.number,
-                labels=args["--tag"],
-                body=issue.body,
-                title=issue.title,
+                issue_number=(issue.number if issue is not None else "N/A"),
+                labels=labels,
+                body=args["IDEA"],
+                title=args["--title"],
+                assignees=assignees,
+                milestone=(milestone.title if milestone is not None else None),
             )
         )
 
-        if args["--open"]:
+        if args["--open"] and not url == "N/A":
             webbrowser.open(url)
     else:
-        card = column.create_card(note=idea)
-        url = project.html_url
+
+        card = None
+        if not args["--dry-run"]:
+            card = column.create_card(note=idea)
+            url = project.html_url
+        else:
+            print_dry_run(f"column.create_card(note={idea!r}")
+            url = "N/A"
 
         print(
             make_github_project_art(
@@ -279,7 +368,7 @@ def push_to_repo(args: Dict[str, Any]) -> None:
         )
 
         # Open project URL
-        if args["--open"]:
+        if args["--open"] and url != "N/A":
             webbrowser.open(url)
 
 
@@ -290,7 +379,7 @@ def push_to_user(args: Dict[str, Any]) -> None:
     column_name: str = args["PROJECT"]
     username = github_username(gh)
     print(
-        f"Saving card in {dye(github_username(gh), C_PRIMARY)} › {dye(project_name, C_PRIMARY)} › {dye(column_name, C_PRIMARY)}..."
+        f"Saving card in {dye(username, C_PRIMARY)} › {dye(project_name, C_PRIMARY)} › {dye(column_name, C_PRIMARY)}..."
     )
     project = None
     user = gh.get_user(github_username(gh))
@@ -300,7 +389,7 @@ def push_to_user(args: Dict[str, Any]) -> None:
             break
 
     # Project not found
-    if project_name is None and args["--create-missing"]:
+    if project is None and args["--create-missing"]:
         if ask(q.Confirm("ans", message=f"Create missing project {project_name!r}?")):
             description = ask(
                 q.Editor("ans", message="Enter the project's description...")
@@ -309,8 +398,8 @@ def push_to_user(args: Dict[str, Any]) -> None:
         else:
             return
     # Not found and not create
-    elif project_name is None:
-        print(dye(f"Error: project {project_name!r} does not exist!", fg=0xF00))
+    elif project is None:
+        print(error_message_no_object_found("project", project_name))
         return
 
     # Column
@@ -321,18 +410,22 @@ def push_to_user(args: Dict[str, Any]) -> None:
             break
 
     # Column not found
-    if column_name is None and args["--create-missing"]:
+    if column is None and args["--create-missing"]:
         if ask(q.Confirm("ans", message=f"Create missing column {column_name!r}?")):
             column = project.create_column(column_name)
         else:
             return
     # Not found and not create
-    elif column_name is None:
-        print(dye(f"Error: column {column_name!r} does not exist!", fg=0xF00))
+    elif column is None:
+        print(error_message_no_object_found("column", column_name))
         return
 
-    column.create_card(note=idea)
-    url = project.html_url
+    if not args["--dry-run"]:
+        column.create_card(note=idea)
+        url = project.html_url
+    else:
+        print_dry_run(f"column.create_card(note={idea!r})")
+        url = "N/A"
 
     print(
         make_github_user_project_art(
@@ -345,5 +438,11 @@ def push_to_user(args: Dict[str, Any]) -> None:
     )
 
     # Open project URL
-    if args["--open"]:
+    if args["--open"] and url != "N/A":
         webbrowser.open(url)
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

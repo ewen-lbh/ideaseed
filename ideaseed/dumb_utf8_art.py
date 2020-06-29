@@ -1,24 +1,26 @@
+from os import get_terminal_size
 from ideaseed.constants import COLOR_NAME_TO_HEX_MAP, C_PRIMARY
 from typing import *
-
 from github.Repository import Repository
-from ideaseed.utils import dye
+from github.Label import Label
+from ideaseed.utils import dye, english_join, readable_text_color_on, render_markdown
 from wcwidth import wcswidth
 import textwrap
 import cli_box
+from strip_ansi import strip_ansi
 
 ABOUT_SCREEN = """
 
 
-                ██████████  ██  ██  
-                ██      ██  ██  ██  
-                ██████████  ██  ██ 
-                ██      ██  ██  ██ 
-                ██████████████████  <- that's my personal logo,
-                ██      ██      ██     i didn't make one for 
-                ██████████      ██     ideaseed, yet™
-                ██      ██      ██ 
-                ██████████      ██ 
+                ██████████  ██  ██
+                ██      ██  ██  ██
+                ██████████  ██  ██
+                ██      ██  ██  ██
+                ██████████████████
+                ██      ██      ██
+                ██████████      ██
+                ██      ██      ██
+                ██████████      ██
       
             ideaseed v{version}
             by Ewen Le Bihan
@@ -47,14 +49,20 @@ CARD_LINE_SEPARATOR = "─" * CARD_INNER_WIDTH
 ISSUE_ART = """\
 Opening issue in {owner} › {repository} › {project} › {column}...
 
-{issue_card}
- │
-[Ω] @{username} self-assigned this
+{issue_card}{timeline_item_milestone}{timeline_item_assignees}
  │
 [◫] @{username} added this to {column} in {project}
  │
  →  Issue available at {url}
 """
+
+GITHUB_ISSUE_TIMELINE_ITEM_MILESTONE_ART = """
+ │
+[⚐] @{username} added this to the {title} milestone"""
+
+GITHUB_ISSUE_TIMELINE_ITEM_ASSIGNEES_ART = """
+ │
+[Ω] @{username} {assignation_sentence}"""
 
 GITHUB_CARD_ART = """\
 {card_header}
@@ -66,6 +74,14 @@ GITHUB_ART = """\
  │
  →  Project card available at {url}
 """
+
+
+def strwidth(o: str) -> int:
+    """
+    Smartly calculates the actual width taken on a terminal of `o`. 
+    Handles ANSI codes (using `strip-ansi`) and Unicode (using `wcwidth`)
+    """
+    return wcswidth(strip_ansi(o))
 
 
 def make_card_header(left: str, right: str) -> str:
@@ -80,20 +96,19 @@ def make_card_header(left: str, right: str) -> str:
     right = str(right)
     # Card width
     # Calculate max length of title
-    left_max_len = CARD_INNER_WIDTH - wcswidth(right) - 2
-    if wcswidth(left) >= left_max_len:
+    left_max_len = CARD_INNER_WIDTH - strwidth(right) - 2
+    if strwidth(left) >= left_max_len:
         left = f"{left:.{left_max_len-1}}" + "…"
 
-    spaces = " " * (CARD_INNER_WIDTH - wcswidth(left) + 2 - wcswidth(right))
+    spaces = " " * (CARD_INNER_WIDTH - strwidth(left) + 2 - strwidth(right))
 
     return left + spaces + right
 
 
-ISSUE_CARD_ART = f"""\
-{{card_header}}
-{{content}}
-{CARD_LINE_SEPARATOR}
-{{labels}}
+ISSUE_CARD_ART = """\
+{card_header}
+
+{content}{labels}
 """
 
 TAGS_ART = "[{tag}]"
@@ -106,39 +121,39 @@ Adding card to your Google Keep account:
  →  Available at {url}
 """
 
-GOOGLE_KEEP_CARD_ART = f"""\
-{{card_header}}
-{{content}}
-{CARD_LINE_SEPARATOR}
-{{tags}}
+GOOGLE_KEEP_CARD_ART = """\
+{card_header}
+
+{content}{tags}
 """
 
-GOOGLE_KEEP_PINNED = "⚲ Pinned"
+GOOGLE_KEEP_PINNED = "⚲"
 
 
 def make_google_keep_art(
-    title: Optional[str], pinned: bool, tags: List[str], url: str, body: str, color: str
+    title: Optional[str],
+    pinned: bool,
+    tags: List[str],
+    url: str,
+    body: str,
+    color: str,
 ) -> str:
+    hex_color = COLOR_NAME_TO_HEX_MAP.get(color)
     card_header = make_card_header(
-        left=title or "", right=GOOGLE_KEEP_PINNED if pinned else ""
+        left=dye(title or "", style="bold"), right=GOOGLE_KEEP_PINNED if pinned else ""
     )
     card = cli_box.rounded(
         GOOGLE_KEEP_CARD_ART.format(
             card_header=card_header,
-            content=body,
-            tags=" ".join([TAGS_ART.format(tag=t) for t in tags])
+            content=render_markdown(wrap_card_content(body)),
+            tags="\n\n" + "  ".join([format_label(t, hex_color or 0xDDD) for t in tags])
             if tags
-            else "No tags.",
+            else "",
         ),
         align="left",
     )
 
-    card = "\n".join(
-        [
-            dye(line, bg=COLOR_NAME_TO_HEX_MAP[color], fg=0x000)
-            for line in card.split("\n")
-        ]
-    )
+    card = "\n".join([dye(line, fg=hex_color) for line in card.split("\n")])
     return GOOGLE_KEEP_ART.format(card=card, url=url)
 
 
@@ -154,7 +169,8 @@ def make_github_project_art(
     )
     card = cli_box.rounded(
         GITHUB_CARD_ART.format(
-            content=wrap_card_content(body), card_header=card_header
+            content=render_markdown(wrap_card_content(body)),
+            card_header=dye(card_header, style="dim"),
         ),
         align="left",
     )
@@ -167,7 +183,8 @@ def make_github_user_project_art(
     card_header = make_card_header(left=f"@{username}", right=f"{column} in {project}")
     card = cli_box.rounded(
         GITHUB_CARD_ART.format(
-            content=wrap_card_content(body), card_header=card_header
+            content=render_markdown(wrap_card_content(body)),
+            card_header=dye(card_header, style="dim"),
         ),
         align="left",
     )
@@ -181,26 +198,81 @@ def make_github_issue_art(
     column: str,
     username: str,
     url: str,
-    issue_number: int,
-    labels: List[str],
+    issue_number: Union[str, int],
+    labels: List[Label],
     body: str,
     title: Optional[str],
+    assignees: List[str],
+    milestone: Optional[str],
 ) -> str:
-    card_header = make_card_header(left=title or "", right=f"#{issue_number}")
+    card_header = make_card_header(
+        left=dye(title or "", style="bold"), right=dye(f"#{issue_number}", fg=C_PRIMARY)
+    )
+    timeline_item_milestone = ""
+    if milestone:
+        timeline_item_milestone = GITHUB_ISSUE_TIMELINE_ITEM_MILESTONE_ART.format(
+            username=username, title=dye(milestone, style="bold")
+        )
+    timeline_item_assignees = ""
+    if assignees:
+        timeline_item_assignees = GITHUB_ISSUE_TIMELINE_ITEM_ASSIGNEES_ART.format(
+            username=username,
+            assignation_sentence=(
+                "self-assigned this"
+                if assignees == [username]
+                else (
+                    "assigned "
+                    + english_join([dye("@" + a, style="bold") for a in assignees])
+                    + " to this"
+                )
+            ),
+        )
     card = cli_box.rounded(
         ISSUE_CARD_ART.format(
             card_header=card_header,
-            content=wrap_card_content(body),
-            labels=" ".join([TAGS_ART.format(tag=t) for t in labels]),
+            content=render_markdown(wrap_card_content(body)),
+            labels="\n\n" + "  ".join([format_label(l.name, l.color) for l in labels])
+            if labels
+            else "",
         ),
         align="left",
     )
+
     return ISSUE_ART.format(
         owner=dye(owner, fg=C_PRIMARY, style="bold"),
         repository=dye(repository, fg=C_PRIMARY, style="bold"),
         project=dye(project, fg=C_PRIMARY, style="bold"),
         column=dye(column, fg=C_PRIMARY, style="bold"),
-        username=dye(username, style="bold"),
+        username=username,
         url=dye(url, style="bold"),
         issue_card=card,
+        timeline_item_milestone=timeline_item_milestone,
+        timeline_item_assignees=timeline_item_assignees,
     )
+
+
+def format_label(
+    name: str, color: str = "DDDDDD", text_color: Optional[str] = None
+) -> str:
+    """
+    Renders a label using a color
+    
+    ``text_color`` defaults to ``readable_text_color_on(color)``
+    
+    WARN: ``color`` and ``text_color`` must be a 6-digit-long hexstring representing the color.
+    """
+    text_color = readable_text_color_on(color) if text_color is None else text_color
+    return dye(f" {name} ", bg=color, fg=text_color)
+
+
+def ask_text(message: str, input_indicator: str = "=> ") -> str:
+    # mimicking pyinquirer's style so it's consistent...
+    icon = "[" + dye("?", fg="yellow") + "] "
+    # width: the terminal's width, up to 200 (a paragraph too wide is ugly)
+    max_width = min(200, get_terminal_size().columns)
+    ans = input(
+        textwrap.fill(icon + message, max_width, subsequent_indent=" " * strwidth(icon))
+        + f"\n\n{input_indicator}"
+    )
+    print()
+    return ans

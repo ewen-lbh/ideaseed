@@ -1,8 +1,8 @@
 """Note down your ideas and get them to the right place, without switching away from your terminal
 
 Usage: 
-    ideaseed (--help | --about | --version)
-    ideaseed [options] [-t TAG...] [-l LABEL...] ARGUMENTS...
+    ideaseed (--help | --about | --version | --config)
+    ideaseed [options] [-t TAG...] [-l LABEL...] [-# LABEL...] [-@ USERNAME...] ARGUMENTS...
     ideaseed [options] --interactive
 
 Examples:
@@ -11,7 +11,7 @@ Examples:
     # Save a card "lorem" in your-username/ipsum > project "ipsum" > column "To-Do"
     $ ideaseed ipsum "lorem"
     # Save a card "a CLI to note down ideas named ideaseed" in your user profile > project "incubator" > column "willmake"
-    $ ideaseed --user-keyword=project --user-project=incubator project "a CLI to note down ideas named ideaseed"
+    $ ideaseed --user-keyword=project --user-project=incubator project willmake "a CLI to note down ideas named ideaseed"
 
 Arguments:
     REPO        Select a repository
@@ -19,9 +19,9 @@ Arguments:
                     If --user-keyword's value is given  Creates a card on your user's project (select which project with --user-project)
                     If given in the form OWNER/REPO     Uses the repository OWNER/REPO
                     If given in the form REPO           Uses the repository "your username/REPO"
-    PROJECT     Select a project by name to put your card to [default: REPO's value]
+    PROJECT     Select a project by name to put your card to [default: --default-project's value]
                     If creating a card on your user's project, this becomes the COLUMN
-    COLUMN      Select a project's column by name [default: To do]
+    COLUMN      Select a project's column by name [default: --default-column's value]
                     If creating a card on your user's project, this is ignored
 
 Options:
@@ -37,12 +37,42 @@ Options:
     -o --open               Open the relevant URL in your web browser.
        --about              Details about ideaseed like currently-installed version
        --version            Like --about, without dumb and useless stuff
+    -c --color COLOR           Chooses which color to use for Google Keep cards. See Color names for allowed values.
+    -t --tag TAG               Adds tags to the Google Keep card or labels to the GitHub issue (see --issue). Use it multiple times to set multiple tags.
+    -i --issue                 Creates an issue for the card and link them together. IDEA becomes the issue's title, except if --title is specified,
+                               in which case IDEA becomes the issue's description and --title's value the issue title.
+    (WIP) -I --interactive     Prompts you for the above options when they are not provided.
+    -T --title TEXT            Sets the Google Keep card's title. When used with --issue, sets the issue's title.
+    -L --logout                Clears the authentification cache
+    -m --create-missing        Create non-existant tags, labels, projects or columns specified, upon confirmation.
+    -o --open                  Open the relevant URL in your web browser.
+    -l --label LABEL           Alias for --tag. See --tag's description.
+    -# --label LABEL           Just another shorthand for --label.
+    -@ --assign-to USERNAME    Assigns users to the created issue. Only works when --issue is used.
+    -M --milestone TITLE       Assign the issue to a milestone with title TITLE.
+       --pin                   Pin Google Keep cards
+       --dry-run               Don't actually affect websites, put print what it would've done. Still logs in. Beware, --create-missing ignores this flag and still creates missing objects.
+       --about                 Details about ideaseed like currently-installed version
+       --config                Easily configure your ideaseed and create your alias.
+       --version               Like --about, without dumb and useless stuff
 
-Settings options: It's comfier to set these in your alias, e.g. alias idea="ideaseed --user-project=incubator --user-keyword=project --no-auth-cache --create-missing"
+Settings options: It's comfier to set these in your alias (run `ideaseed --config`)
        --user-project NAME     Name of the project to use as your user project
        --user-keyword NAME     When REPO is NAME, creates a GitHub card on your user profile instead of putting it on REPO
        --no-auth-cache         Don't save credentials in a temporary file at {cache_filepath}
        --no-check-for-updates  Don't check for updates, don't prompt to update when current version is outdated
+       --no-self-assign        Don't assign the issue to yourself
+    
+    Options beginning with --default can refer to some dynamic information using %(placeholder)s.
+    Available placeholders:
+        repository - the repository's name
+        owner      - the repository's owner
+        username   - the username of which account you are using ideaseed with
+        project    - the selected project's name (only available to --default-column)
+    
+       --default-column NAME   Set the default column name. [default: To Do]
+       --default-project NAME  Set the default project name. [default: %(repository)s]
+       
 
 Color names: Try with the first letter only too
     blue, brown, darkblue, gray, green, orange, pink, purple, red, teal, white, yellow
@@ -54,7 +84,7 @@ Color names: Try with the first letter only too
 """
 
 from ideaseed.update_checker import get_latest_version
-from ideaseed import update_checker
+from ideaseed import update_checker, config_wizard
 from ideaseed.gkeep import push_to_gkeep
 from ideaseed.github import clear_auth_cache, push_to_repo, push_to_user
 from typing import *
@@ -73,7 +103,6 @@ def run(argv=None):
         )
     )
     validate_argument_presence(args)
-    args = resolve_arguments_defaults(args)
 
     args["--tag"] += args["--label"]
     # Remove duplicate tags
@@ -85,15 +114,27 @@ def run(argv=None):
         latest_version = get_latest_version()
         if latest_version > VERSION:
             print(update_checker.notification(VERSION, latest_version))
-            if update_checker.prompt(latest_version):
+            if update_checker.prompt(VERSION, latest_version):
                 update_checker.upgrade(latest_version)
                 print(f"Re-running your command with ideaseed v{latest_version}...")
                 print("Running " + " ".join(sys.argv))
                 subprocess.run(sys.argv)
                 return
 
+    if args["--dry-run"]:
+        print(
+            dye(
+                f"\n============ Running in {dye('dry run', style='bold', fg=0xfff)} {dye('mode ============', style='dim')}\n",
+                style="dim",
+            )
+        )
+
     if args["--about"]:
         print(ABOUT_SCREEN.format(version=VERSION))
+        return
+
+    if args["--config"]:
+        config_wizard.run()
         return
 
     if args["--version"]:
@@ -137,14 +178,6 @@ def resolve_arguments(args: Dict[str, Any]) -> Dict[str, Any]:
     return {"REPO": repo, "PROJECT": project, "COLUMN": column, "IDEA": idea, **args}
 
 
-def resolve_arguments_defaults(args: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        **args,
-        "PROJECT": args["PROJECT"] or args["REPO"],
-        "COLUMN": args["COLUMN"] or "To do",
-    }
-
-
 class ValidationError(Exception):
     pass
 
@@ -157,24 +190,34 @@ def validate_argument_presence(args: Dict[str, str]) -> None:
 
     GOOGLE_KEEP_ONLY = ("--color",)
     GITHUB_ONLY = ("--issue",)
+    GITHUB_ISSUE_ONLY = ("--milestone", "--assign-to")
     using_github = len(args["ARGUMENTS"]) > 1
 
-    if using_github and not args["--issue"] and args["--tag"]:
+    if using_github and not args["--issue"] and (args["--tag"] or args["--label"]):
         raise ValidationError(
-            "--tag may only be used alongside --issue or when"
-            "adding a card to Google Keep."
+            "--label (or --tag) can only be used with --issue or when creating"
+            "a Google Keep card."
+        )
+
+    if not args["--issue"] and any(
+        [v for k, v in args.items() if k in GITHUB_ISSUE_ONLY]
+    ):
+        raise ValidationError(
+            "The following options only work when --issue is used: "
+            + ", ".join(GITHUB_ISSUE_ONLY)
         )
 
     if using_github and any([v for k, v in args.items() if k in GOOGLE_KEEP_ONLY]):
         raise ValidationError(
             "The following options are not allowed when using GitHub: "
             + ", ".join(GOOGLE_KEEP_ONLY)
-            + f"\n{args!r}"
         )
     if not using_github and any([v for k, v in args.items() if k in GITHUB_ONLY]):
         raise ValidationError(
             "The following options are not allowed when using Google Keep: "
             + ", ".join(GITHUB_ONLY)
+            + "\n"
+            + "Maybe you've forgotten to specify a repository? (see ideaseed --help)"
         )
 
 

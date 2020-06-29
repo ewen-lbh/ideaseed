@@ -2,7 +2,7 @@ from typing import *
 from flatten_list.flatten_list import flatten
 from semantic_version import Version
 
-VERSION = Version("0.8.1")
+VERSION = Version("0.11.0")
 
 RELEASES_RSS_URL = "https://pypi.org/rss/project/ideaseed/releases.xml"
 
@@ -28,7 +28,9 @@ COLOR_ALIASES = {
     "Magenta": "Purple",
 }
 
-VALID_COLOR_NAMES = flatten(list(COLOR_ALIASES.items()))
+VALID_COLOR_NAMES = list(flatten(list(COLOR_ALIASES.items()))) + list(
+    COLOR_NAME_TO_HEX_MAP.keys()
+)
 
 # colors
-C_PRIMARY = 0x268CCE
+C_PRIMARY = "blue"
