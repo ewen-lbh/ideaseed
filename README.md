@@ -138,7 +138,7 @@ ideaseed [options] user PROJECT COLUMN TITLE BODY
 
 #### Labels
 
-Add labels by using `-#/--tag` one or more times.
+Add labels by using `-#/--label` one or more times.
 This works on Google Keep or when creating issues. 
 
 #### Assignees/Collaborators
@@ -249,17 +249,15 @@ Usage:
     ideaseed [options] version | --version
     ideaseed [options] help | --help
     ideaseed [options] update
-    ideaseed [options] [-# TAG...] [-@ USER...] user BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] user TITLE BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] user PROJECT TITLE BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] user PROJECT COLUMN TITLE BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] TITLE BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] REPO TITLE BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] REPO COLUMN TITLE BODY
-    ideaseed [options] [-# TAG...] [-@ USER...] REPO PROJECT COLUMN TITLE BODY
-
-
+    ideaseed [options] [-# LABEL...] [-@ USER...] user BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] user TITLE BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] user PROJECT TITLE BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] user PROJECT COLUMN TITLE BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] TITLE BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] REPO TITLE BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] REPO COLUMN TITLE BODY
+    ideaseed [options] [-# LABEL...] [-@ USER...] REPO PROJECT COLUMN TITLE BODY
 Commands:
     user                    Creates cards in your user's project. 
                             (see https://github.com/users/YOURUSERNAME/projects)
@@ -272,8 +270,6 @@ Commands:
     version                 Outputs the version number
     update                  Check for updates. If any is available, shows the changelog. 
                             You can then decide to install the new version.
-
-
 Arguments:
     BODY      Sets the note's body. Required.
     TITLE     Sets the title.
@@ -287,8 +283,6 @@ Arguments:
               Can use Placeholders
     COLUMN    Specify which column to use.
               Can use Placeholders.
-
-
 Options:
     -I --no-issue           Only creates a project card, no issue is created.
                             Has no effect when used without a REPO
@@ -296,30 +290,29 @@ Options:
     -R --repo=REPO          Specifies REPOSITORY
     -P --project=PROJECT    Specifies PROJECT
     -C --column=COLUMN      Specifies COLUMN
-    -# --tag=TAG...         Add tags (GitHub) or labels (Google Keep)
+    -# --label=LABEL...     Add labels
                             Can be specified multiple times.
+                            Cannot be used in the 'user' command.
+                            Cannot be used with --no-issue
     -o --open               Open the created card (or issue) in your $BROWSER.
        --dry-run            Tell what will happen but does not do it. Still logs you in.
                             Beware, objects created with --create-missing will
                             still be created.
-    -m --create-missing     Creates missing objects (projects, columns, and labels/tags)
+    -m --create-missing     Creates missing objects (projects, columns, and labels/labels)
     -@ --assign=USER...     Assign USER to the created issue. 
                             Can be specified multiple times.
                             Cannot be used in the 'user' command.
-
+                            Cannot be used with --no-issue
     REPO only: 
        --self-assign        Assign the created issue to yourself. 
                             Has no effect when --assign is used.
     -M --milestone=NAME     Adds the issue to the milestone NAME.
-
     Google Keep only:
        --pin                Pins the card. 
        --color=COLOR        Sets the card's color. [default: white]
                             Available values: blue, brown, darkblue (or indigo), 
                             gray (or grey), green, orange, pink, purple (or magenta), 
                             red, teal (or cyan), white, yellow. 
-
-
 Configuration:
    --default-column=COLUMN    Specifies the Default Column. 
                               Used when PROJECT is set but not COLUMN
@@ -330,12 +323,10 @@ Configuration:
                               If not set, or set to '<None>',
                               using REPO without PROJECT creates an issue
                               without its project card.
-   --auth-cache=FILEPATH      Set the filepath for the auth. cache [default: /home/ewen/cache/ideaseed/auth.json]
+   --auth-cache=FILEPATH      Set the filepath for the auth. cache [default: ~/.cache/ideaseed/auth.json]
                               If set to '<None>', disables caching of credentials.
                               Has no effect when used with --keyring.
    --check-for-updates        Check for new versions and show a notification if a new one is found.
-
-
 Placeholders:
     {repository}      Replaced with the repository's name
     {owner}           Replaced with the repository's owner
