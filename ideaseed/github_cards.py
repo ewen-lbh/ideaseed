@@ -510,11 +510,7 @@ def with_link(o: Union[ProjectColumn, Project, Issue, NamedUser, Milestone]) -> 
             f"ideaseed.github_cards.with_link: object {o!r} has neither .number, nor .name, nor .title, nor .login attributes"
         )
 
-    if isinstance(o, ProjectColumn) or isinstance(o, Milestone):
-        url = o.url
-    else:
-        url = o.html_url
-
+    url = o.url if isinstance(o, (ProjectColumn, Milestone)) else o.html_url
     return ui.href(name, url)
 
 

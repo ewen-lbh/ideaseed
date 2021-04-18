@@ -1,6 +1,6 @@
 from pathlib import Path
 
-names = dict()
+names = {}
 
 content = Path("./callgraph.dot").read_text("utf-8")
 

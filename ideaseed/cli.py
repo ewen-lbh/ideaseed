@@ -218,11 +218,11 @@ def flags_to_args(flags: dict[str, Any]) -> dict[str, Any]:
     {'about': False, 'assign': None, 'auth_cache': '~/.cache/ideaseed/auth.json', 'create_missing': False, 'default_project': None, 'tag': None, 'title': 'a', 'version': True, 'body': 'b', 'column': None, 'repo': None}
     """
     args = {}
-    for name in flags.keys():
+    for name in flags:
         if flags[name] == "<None>":
             flags[name] = None
         normalized_name = name.removeprefix("--").replace("-", "_").lower()
-        if normalized_name in args.keys():
+        if normalized_name in args:
             args[normalized_name] = args[normalized_name] or flags[name]
         else:
             args[normalized_name] = flags[name]

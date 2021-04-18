@@ -77,9 +77,12 @@ class BetterPrompt(Prompt):
 
     def process_response(self, value: str) -> PromptType:
         val = super().process_response(value)
-        if isinstance(self.choices, dict):
-            if val not in self.choices.values() and val in self.choices.keys():
-                return self.choices[val]
+        if (
+            isinstance(self.choices, dict)
+            and val not in self.choices.values()
+            and val in self.choices.keys()
+        ):
+            return self.choices[val]
         return val
 
 

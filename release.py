@@ -167,7 +167,7 @@ with open(f"{pkgname}/constants.py", encoding="utf8") as constants_py:
     patt = re.compile(r'^VERSION = Version\(".+"\)$')
     lines = constants_py.read().split("\n")
     new_lines = lines
-    for i, line in enumerate(lines):
+    for i, line in enumerate(new_lines):
         debug(f"Trying to match line {line!r}", end="")
         if patt.match(line):
             new_lines[i] = f'VERSION = Version("{new}")'

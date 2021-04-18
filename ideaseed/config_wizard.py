@@ -26,8 +26,7 @@ def get_shell_name() -> str:
     executable_path = getenv("SHELL")
     if not executable_path:
         return ""
-    shell_name = Path(executable_path).stem
-    return shell_name
+    return Path(executable_path).stem
 
 
 SHELL_NAMES_TO_RC_PATHS = {
@@ -165,7 +164,7 @@ def prompt_for_settings() -> tuple[dict[str, str], str]:
 def placeholders_validator(valid_placeholers: set[str]) -> Callable[[str], bool]:
     def _validate(text: str):
         all_placeholders = [p[1] for p in string.Formatter().parse(text)]
-        if not all(p in valid_placeholers for p in all_placeholders):
+        if any(p not in valid_placeholers for p in all_placeholders):
             raise InvalidResponse(
                 f"Allowed placeholders are {english_join(['{%s}' % p for p in valid_placeholers])}"
             )
