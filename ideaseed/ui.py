@@ -63,6 +63,8 @@ class FramelessCodeBlock(CodeBlock):
 
 Markdown.elements["code_block"] = FramelessCodeBlock
 
+def accented(text: str) -> str:
+    return f"[blue]{text}[/blue]"
 
 class Label(NamedTuple):
     name: str
@@ -125,6 +127,7 @@ def make_table(
     project_column: Optional[str] = None,
     url: Optional[str] = None,
     local_copy: Optional[str] = None,
+    git_bug_id: Optional[str] = None,
 ) -> Table:
     assignees = assignees or []
     listing = Table.grid(expand=True, padding=0)
@@ -146,7 +149,10 @@ def make_table(
         listing.add_row("Available at", f"[blue link {url}]{rich.markup.escape(url)}")
 
     if local_copy:
-        listing.add_row("Local copy saved to", f"[blue]{local_copy}")
+        listing.add_row("Local copy saved to", accented(local_copy))
+    
+    if git_bug_id:
+        listing.add_row("Git bug added with SHA", accented(git_bug_id))
 
     return listing
 

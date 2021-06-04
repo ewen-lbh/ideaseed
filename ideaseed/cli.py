@@ -158,7 +158,7 @@ from docopt import docopt
 from rich import print
 
 from ideaseed import (authentication, config_wizard, github_cards, gkeep,
-                      ondisk, update_checker, ui)
+                      ondisk, update_checker, ui, git_bug)
 from ideaseed.constants import VALID_COLOR_NAMES, VERSION
 from ideaseed.ondisk import Idea
 from ideaseed.ui import ABOUT_SCREEN, show_dry_run_banner, make_table
@@ -243,6 +243,10 @@ def run(argv=None):
     else:
         show_dry_run_banner(**args)
         idea = gkeep.push_to_gkeep(**args) or Idea()
+    
+    if git_bug.using():
+        git_bug_short_sha = git_bug.create(idea)
+        ui.get_console().print(ui.make_table(git_bug_id=git_bug_short_sha))
 
     if args["local_copy"] and idea.body:
         local_copy_dir = Path(args["local_copy"]).expanduser()
@@ -258,7 +262,6 @@ def run(argv=None):
                 ui.get_console().print(make_table(local_copy=saved_to))
             else:
                 print(f"[yellow]Did not save a local copy")
-
 
 def flags_to_args(flags: dict[str, Any]) -> dict[str, Any]:
     """
